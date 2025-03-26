@@ -1,0 +1,60 @@
+---
+- name: Deploy Apache Web Server on Red Hat
+  hosts: webservers
+  become: yes
+  vars:
+    apache_package: httpd
+    apache_service: httpd
+    website_root: /var/www/nominet_test
+    website_index_file: index.html
+    apache_config_file: /etc/httpd/conf.d/nominet_test.conf
+
+  tasks:
+
+    - name: Install Apache HTTPD
+      yum:
+        name: "{{ apache_package }}"
+        state: present
+
+    - name: Ensure Apache is enabled and started
+      service:
+        name: "{{ apache_service }}"
+        state: started
+        enabled: yes
+
+    - name: Create website root directory
+      file:
+        path: "{{ website_root }}"
+        state: directory
+        owner: apache
+        group: apache
+        mode: '0755'
+
+    - name: Copy index.html to website directory
+      copy:
+        src: "files/{{ website_index_file }}"
+        dest: "{{ website_root }}/index.html"
+        owner: apache
+        group: apache
+        mode: '0644'
+
+    - name: Configure Apache to serve custom website
+      copy:
+        dest: "{{ apache_config_file }}"
+        content: |
+          <VirtualHost *:80>
+              DocumentRoot "{{ website_root }}"
+              <Directory "{{ website_root }}">
+                  AllowOverride None
+                  Require all granted
+              </Directory>
+          </VirtualHost>
+      notify:
+        - Restart Apache
+
+  handlers:
+    - name: Restart Apache
+      service:
+        name: "{{ apache_service }}"
+        state: restarted
+
